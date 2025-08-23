@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "src/nr/demo_transfer_contract",
+    "src/nr/token_contract"
+]
