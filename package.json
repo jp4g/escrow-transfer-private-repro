@@ -37,7 +37,7 @@
     "husky": "9.1.7",
     "lint-staged": "15.4.3",
     "prettier": "3.4.2",
-    "tsx": "4.20.4",
+    "tsx": "4.20.5",
     "typescript": "5.7.2",
     "vitest": "3.2.4"
   },
