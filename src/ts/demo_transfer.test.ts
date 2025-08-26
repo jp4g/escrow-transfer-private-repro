@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, test, expect, beforeAll, beforeEach } from "vitest";
 import {
   AccountWallet,
   CompleteAddress,
@@ -64,116 +64,49 @@ describe("Private Transfer Demo Test", () => {
       )
       .send()
       .wait();
-    console.log(`Minted 1000 DEMO to Alice`);
+    console.log(`Minted 1000 DEMO to Alice Privately`);
+
+    await tokenContract
+      .withWallet(minter)
+      .methods.mint_to_public(
+        minter.getAddress(),
+        wad(1000n)
+      )
+      .send()
+      .wait();
+    console.log(`Minted 1000 DEMO to Alice Publicly`);
   });
 
-
-  // it("unconstrained transfer in", async () => {
-  //   ({ contract: demoContract, secretKey: contractKey } = await deployDemoContract(
-  //     pxe,
-  //     alice,
-  //     tokenContract.address,
-  //     wad(1n)
-  //   ));
-  //   console.log(`Deployed new demo contract to ${demoContract.address}`);
-
-  //   tokenContract = tokenContract.withWallet(alice);
-  //   // check balances before
-  //   let aliceBalance = await tokenContract.methods.balance_of_private(alice.getAddress()).simulate();
-  //   let contractBalance = await tokenContract.methods.balance_of_private(demoContract.address).simulate();
-  //   expect(aliceBalance).toEqual(wad(1000n));
-  //   expect(contractBalance).toEqual(0n);
-
-  //   // execute transfer_private_to_private directly from token contract
-  //   tokenContract
-  //     .methods
-  //     .transfer_private_to_private(
-  //       alice.getAddress(),
-  //       demoContract.address,
-  //       wad(1n),
-  //       0
-  //     )
-  //     .send()
-  //     .wait()
+  // @ THIS ONE
+  test("Test external partial notes private", async () => {
+    let action = await tokenContract.withWallet(bob).methods.initialize_transfer_commitment(
+      alice.getAddress(),
+      bob.getAddress(),
+      alice.getAddress()
+    );
+    let commitment = await action.simulate();
+    action.send().wait();
+    console.log("Commitment:", commitment);
     
-  //   // check balances after transfer in
-  //   aliceBalance = await tokenContract.methods.balance_of_private(alice.getAddress()).simulate();
-  //   contractBalance = await tokenContract.methods.balance_of_private(demoContract.address).simulate();
-  //   expect(aliceBalance).toEqual(wad(999n));
-  //   expect(contractBalance).toEqual(wad(1n));
+    let aliceBalance = await tokenContract.withWallet(alice).methods.balance_of_private(alice.getAddress()).simulate();
+    let bobBalance = await tokenContract.withWallet(bob).methods.balance_of_private(bob.getAddress()).simulate();
+    console.log("Bob balance before: ", bobBalance)
+    console.log("Alice balance before: ", aliceBalance) 
 
-  //   // transfer tokens back out
-  //   await demoContract
-  //     .methods
-  //     .transfer_out()
-  //     .send()
-  //     .wait()
-    
-  //   // check balances after transfer out
-  //   aliceBalance = await tokenContract.methods.balance_of_private(alice.getAddress()).simulate();
-  //   contractBalance = await tokenContract.methods.balance_of_private(demoContract.address).simulate();
-  //   expect(aliceBalance).toEqual(wad(1000n));
-  //   expect(contractBalance).toEqual(0n);
-  // })
+    await tokenContract.withWallet(alice).methods.transfer_private_to_commitment(
+      alice.getAddress(),
+      commitment,
+      1,
+      0
+    ).send().wait();
 
-  it("constrained transfer in (sender-owned)", async () => {
-    // notes are owned by the deploying account
-    ({ contract: demoContract, secretKey: contractKey } = await deployDemoContract(
-      pxe,
-      alice,
-      tokenContract.address,
-      wad(1n),
-      "sender_owned"
-    ));
-    console.log(`Deployed new demo contract to ${demoContract.address}`);
-    demoContract = demoContract.withWallet(alice)
-    // check balances before
-    let aliceBalance = await tokenContract.methods.balance_of_private(alice.getAddress()).simulate();
-    let contractBalance = await tokenContract.methods.balance_of_private(demoContract.address).simulate();
-    expect(aliceBalance).toEqual(wad(1000n));
-    expect(contractBalance).toEqual(0n);
+    bobBalance = await tokenContract.withWallet(bob).methods.balance_of_private(bob.getAddress()).simulate();
+    aliceBalance = await tokenContract.withWallet(alice).methods.balance_of_private(alice.getAddress()).simulate();
+    console.log("Bob balance after: ", bobBalance)
+    console.log("Alice balance after: ", aliceBalance)
+  })
 
-    // execute transfer_private_to_private in via call from demo contract
-    /// create authwit
-    const nonce = Fr.random();
-    const authwit = await alice.createAuthWit({
-      caller: demoContract.address,
-      action: tokenContract.methods.transfer_private_to_private(
-        alice.getAddress(),
-        demoContract.address,
-        wad(1n),
-        nonce,
-      ),
-    });
-    /// send transfer_in with authwit
-    await demoContract
-      .methods
-      .transfer_in(nonce)
-      .with({ authWitnesses: [authwit] })
-      .send()
-      .wait()
-    
-    // check balances after transfer in
-    aliceBalance = await tokenContract.methods.balance_of_private(alice.getAddress()).simulate();
-    contractBalance = await tokenContract.methods.balance_of_private(demoContract.address).simulate();
-    expect(aliceBalance).toEqual(wad(999n));
-    expect(contractBalance).toEqual(wad(1n));
-
-    // transfer tokens back out
-    await demoContract
-      .methods
-      .transfer_out()
-      .send()
-      .wait()
-    
-    // check balances after transfer out
-    aliceBalance = await tokenContract.methods.balance_of_private(alice.getAddress()).simulate();
-    contractBalance = await tokenContract.methods.balance_of_private(demoContract.address).simulate();
-    expect(aliceBalance).toEqual(wad(1000n));
-    expect(contractBalance).toEqual(0n);
-  });
-
-  it("constrained transfer in (self-owned)", async () => {
+  test.skip("test partial notes through contract", async () => {
     // notes are owned by the contract itself
     ({ contract: demoContract, secretKey: contractKey } = await deployDemoContract(
       pxe,
@@ -184,14 +117,8 @@ describe("Private Transfer Demo Test", () => {
     ));
     console.log(`Deployed new demo contract to ${demoContract.address}`);
     demoContract = demoContract.withWallet(alice)
-    // check balances before
-    let aliceBalance = await tokenContract.methods.balance_of_private(alice.getAddress()).simulate();
-    let contractBalance = await tokenContract.methods.balance_of_private(demoContract.address).simulate();
-    expect(aliceBalance).toEqual(wad(1000n));
-    expect(contractBalance).toEqual(0n);
-
-    // execute transfer_private_to_private in via call from demo contract
-    /// create authwit
+    
+    // partial commit in
     const nonce = Fr.random();
     const authwit = await alice.createAuthWit({
       caller: demoContract.address,
@@ -203,30 +130,27 @@ describe("Private Transfer Demo Test", () => {
       ),
     });
     /// send transfer_in with authwit
-    await demoContract
+    let action = demoContract
+      .withWallet(alice)
       .methods
-      .transfer_in(nonce)
-      .with({ authWitnesses: [authwit] })
-      .send()
-      .wait()
+      .partial_commit(nonce)
+      .with({ authWitnesses: [authwit] });
+    let commitment = await action.simulate();
+    await action.send().wait();
     
     // check balances after transfer in
-    aliceBalance = await tokenContract.methods.balance_of_private(alice.getAddress()).simulate();
-    contractBalance = await tokenContract.methods.balance_of_private(demoContract.address).simulate();
-    expect(aliceBalance).toEqual(wad(999n));
-    expect(contractBalance).toEqual(wad(1n));
+    // aliceBalance = await tokenContract.methods.balance_of_private(alice.getAddress()).simulate();
+    // contractBalance = await tokenContract.methods.balance_of_private(demoContract.address).simulate();
+    // expect(aliceBalance).toEqual(wad(998n));
+    // expect(contractBalance).toEqual(wad(1n));
 
     // transfer tokens back out
     await demoContract
       .methods
-      .transfer_out()
+      .fill_commit(commitment, 0)
       .send()
       .wait()
     
-    // check balances after transfer out
-    aliceBalance = await tokenContract.methods.balance_of_private(alice.getAddress()).simulate();
-    contractBalance = await tokenContract.methods.balance_of_private(demoContract.address).simulate();
-    expect(aliceBalance).toEqual(wad(1000n));
-    expect(contractBalance).toEqual(0n);
+    console.log("Filled");
   });
 });

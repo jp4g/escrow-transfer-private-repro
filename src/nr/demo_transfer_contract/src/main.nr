@@ -79,6 +79,44 @@ pub contract DemoContract {
             .call(&mut context);
     }
 
+    #[private]
+    fn partial_commit(_nonce: Field) -> Field {
+        let definition = storage.definition.get_note();
+        let self_address = context.this_address();
+        let caller = context.msg_sender();
+        // transfer in 
+        Token::at(definition.token_address)
+            .transfer_private_to_private(
+                caller,
+                self_address,
+                definition.token_amount,
+                _nonce,
+            )
+            .call(&mut context);
+        // prepare transfer out
+        let commitment = Token::at(definition.token_address)
+            .initialize_transfer_commitment(
+                self_address,
+                caller,
+                self_address
+            ).call(&mut context);
+        commitment
+    }
+
+    #[private]
+    fn fill_commit(commitment: Field, _nonce: Field) {
+        let definition = storage.definition.get_note();
+        let self_address = context.this_address();
+        let caller = context.msg_sender();
+        Token::at(definition.token_address)
+            .transfer_private_to_commitment(
+                self_address,
+                commitment,
+                definition.token_amount,
+                0
+            ).call(&mut context);
+    }
+
     #[utility]
     pub unconstrained fn get_definition() -> DefinitionNote {
         storage.definition.view_note()
